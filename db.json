@@ -1,0 +1,20 @@
+{
+  "books": [
+    {
+      "title": "Evergreen",
+      "author": "Trent Preszler",
+      "category": "History",
+      "coverUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1747382778i/231109690.jpg",
+      "rating": 5,
+      "id": "1"
+    },
+    {
+      "id": "2",
+      "title": "Sandwich",
+      "author": "Catherine Newman",
+      "rating": 3,
+      "category": "Novels",
+      "coverUrl": "https://m.media-amazon.com/images/S/compressed.photo.goodreads.com/books/1699631079i/200028726.jpg"
+    }
+  ]
+}

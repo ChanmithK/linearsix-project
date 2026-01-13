@@ -1,65 +1,205 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useEffect, useMemo, useState } from "react";
+import type { Book, BookInput } from "@/lib/types";
+import { booksApi } from "@/lib/api";
+import { HeaderBar } from "@/components/header-bar";
+import { BookCard } from "@/components/book-card";
+import { BookRow } from "@/components/book-row";
+import { BookFormModal } from "@/components/book-form-modal";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { EmptyState } from "@/components/empty-state";
+import { BookCardSkeleton } from "@/components/book-card-skeleton";
+import { BookRowSkeleton } from "@/components/book-row-skeleton";
+
+export default function HomePage() {
+  const [books, setBooks] = useState<Book[]>([]);
+  const [view, setView] = useState<"grid" | "list">("grid");
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [mutating, setMutating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState<"create" | "edit">("create");
+  const [selected, setSelected] = useState<Book | null>(null);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [toDelete, setToDelete] = useState<Book | null>(null);
+
+  // Load books from API
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await booksApi.list();
+      setBooks(data);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load books");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Fetch books on first render
+  useEffect(() => {
+    load();
+  }, []);
+
+  // Filter books only when books or query changes
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return books;
+    return books.filter(
+      (b) =>
+        b.title.toLowerCase().includes(q) || b.author.toLowerCase().includes(q)
+    );
+  }, [books, query]);
+
+  // Open create book form
+  const openCreate = () => {
+    setSelected(null);
+    setFormMode("create");
+    setFormOpen(true);
+  };
+  // Open edit book form
+  const openEdit = (b: Book) => {
+    setSelected(b);
+    setFormMode("edit");
+    setFormOpen(true);
+  };
+  // Open delete book confirm dialog
+  const openDelete = (b: Book) => {
+    setToDelete(b);
+    setConfirmOpen(true);
+  };
+  // Handle form submission
+  const submitForm = async (payload: BookInput) => {
+    setMutating(true);
+    setError(null);
+
+    try {
+      if (formMode === "create") {
+        const created = await booksApi.create(payload);
+        setBooks((prev) => [created, ...prev]);
+      } else if (formMode === "edit" && selected) {
+        const updated = await booksApi.update(selected.id, payload);
+        setBooks((prev) =>
+          prev.map((x) => (x.id === selected.id ? updated : x))
+        );
+      }
+      setFormOpen(false);
+    } catch (e: any) {
+      setError(e?.message || "Save failed");
+    } finally {
+      setMutating(false);
+    }
+  };
+  // Handle delete confirmation
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    setMutating(true);
+    setError(null);
+
+    try {
+      await booksApi.remove(toDelete.id);
+      setBooks((prev) => prev.filter((x) => x.id !== toDelete.id));
+      setConfirmOpen(false);
+      setToDelete(null);
+    } catch (e: any) {
+      setError(e?.message || "Delete failed");
+    } finally {
+      setMutating(false);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="min-h-screen bg-slate-50">
+      <HeaderBar
+        query={query}
+        onQueryChange={setQuery}
+        view={view}
+        onToggleView={() => setView((v) => (v === "grid" ? "list" : "grid"))}
+        onAdd={openCreate}
+      />
+
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        {error ? (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {error}
+            <button
+              onClick={load}
+              className="ml-3 underline decoration-red-400 underline-offset-2"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+              Retry
+            </button>
+          </div>
+        ) : null}
+
+        {loading ? (
+          view === "grid" ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <BookCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {Array.from({ length: 7 }).map((_, i) => (
+                <BookRowSkeleton key={i} />
+              ))}
+            </div>
+          )
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            title="No books found"
+            subtitle="Try a different search, or add a new book."
+          />
+        ) : view === "grid" ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((b) => (
+              <BookCard
+                key={b.id}
+                book={b}
+                onEdit={openEdit}
+                onDelete={openDelete}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {filtered.map((b) => (
+              <BookRow
+                key={b.id}
+                book={b}
+                onEdit={openEdit}
+                onDelete={openDelete}
+              />
+            ))}
+          </div>
+        )}
       </main>
+
+      <BookFormModal
+        open={formOpen}
+        mode={formMode}
+        initial={selected}
+        onClose={() => setFormOpen(false)}
+        onSubmit={submitForm}
+        loading={mutating}
+      />
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete book?"
+        message={`This will permanently remove "${
+          toDelete?.title ?? ""
+        }" from your library.`}
+        confirmText="Delete"
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={confirmDelete}
+        loading={mutating}
+      />
     </div>
   );
 }
